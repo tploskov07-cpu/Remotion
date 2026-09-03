@@ -94,7 +94,7 @@ export const TEXT_OVERLAY_FPS = 30;
 export const textOverlayDefaultProps: TextOverlayProps = {
   lines: [
     { text: "Закрити кортове", holdSeconds: 1.5 },
-    { text: "Осветление", holdSeconds: 1.5 },
+    { text: "Добро осветление", holdSeconds: 1.5 },
     { text: "Безплатен паркинг", holdSeconds: 4 },
     { text: "Ресторант", holdSeconds: 4 },
     { text: "и уютни съблекални", holdSeconds: 5 },
