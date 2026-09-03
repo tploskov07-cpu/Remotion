@@ -8,6 +8,7 @@ import {
   spring,
   useCurrentFrame,
   useVideoConfig,
+  type CalculateMetadataFunction,
 } from "remotion";
 import { loadFont } from "@remotion/google-fonts/Montserrat";
 import { fitTextOnNLines } from "@remotion/layout-utils";
@@ -15,33 +16,39 @@ import { fitTextOnNLines } from "@remotion/layout-utils";
 // ---------------------------------------------------------------------------
 // Tunables. Everything the animation depends on lives here as props with
 // defaults, so retiming/restyling never requires touching the JSX below.
+// Composition duration derives from `lines` automatically (see
+// calculateTextOverlayMetadata) — add, remove, or retime a line just by
+// editing this list.
 // ---------------------------------------------------------------------------
 
 export type ScrimStyle = "shadow" | "panel";
 
+export type LineConfig = {
+  /** Cyrillic (or any) copy for this line. */
+  text: string;
+  /** How long this line holds on screen, in seconds, before the next one
+   * starts crossing in. */
+  holdSeconds: number;
+};
+
 export type TextOverlayProps = {
-  /** Line 1 copy (Cyrillic). */
-  line1: string;
-  /** Line 2 copy (Cyrillic). */
-  line2: string;
+  /** The sequence of lines shown one after another, each cross-fading into
+   * the next. */
+  lines: LineConfig[];
 
-  /** Frame line 1 starts entering. */
-  line1InStart: number;
-  /** How many frames the line-1 entrance spring takes to settle. */
-  line1InDuration: number;
-  /** Frame line 1 starts sliding out. */
-  line1OutStart: number;
-  /** How many frames the line-1 exit takes. */
-  line1OutDuration: number;
-
-  /** Frame line 2 starts entering (overlaps the line-1 exit). */
-  line2InStart: number;
-  /** How many frames the line-2 entrance spring takes to settle. */
-  line2InDuration: number;
-  /** Frame (absolute) by which line 2 has fully exited — the composition end. */
-  line2OutEnd: number;
-  /** How many frames the line-2 exit takes. */
-  line2OutDuration: number;
+  /** How many frames a line's entrance spring takes to settle. */
+  enterDurationFrames: number;
+  /** How many frames before the boundary to the next line a line starts
+   * entering (so it crosses the outgoing line rather than cutting). */
+  enterLeadFrames: number;
+  /** How many frames a mid-sequence exit takes. */
+  exitDurationFrames: number;
+  /** How many frames before the boundary to the next line a line starts
+   * exiting. */
+  exitLeadFrames: number;
+  /** How many frames the final line's exit takes (it has no next line to
+   * cross into, so this is its own short fade to the end of the video). */
+  finalExitDurationFrames: number;
 
   /** How many frames before a line becomes visible it is premounted for
    * font loading / layout measurement. */
@@ -56,7 +63,8 @@ export type TextOverlayProps = {
   maxFontSize: number;
   /** Upper bound on text block width, in pixels (clamped to the safe area). */
   maxTextWidth: number;
-  /** Max number of lines the auto-fit algorithm may wrap text onto. */
+  /** Max number of lines the auto-fit algorithm may wrap a single line of
+   * copy onto. */
   maxLines: number;
 
   textColor: string;
@@ -84,19 +92,20 @@ export type TextOverlayProps = {
   backgroundVideoVolume?: number;
 };
 
+export const TEXT_OVERLAY_FPS = 30;
+
 export const textOverlayDefaultProps: TextOverlayProps = {
-  line1: "44 евро за корт, ракети и топки.",
-  line2: "Звучи много?",
+  lines: [
+    { text: "Падел се играе от четирима.", holdSeconds: 3 },
+    { text: "Пада се само по 11 евро на човек", holdSeconds: 2.5 },
+    { text: "По-евтино от 1 коктейл в капана!", holdSeconds: 2 },
+  ],
 
-  line1InStart: 0,
-  line1InDuration: 20,
-  line1OutStart: 52,
-  line1OutDuration: 16,
-
-  line2InStart: 56,
-  line2InDuration: 20,
-  line2OutEnd: 120,
-  line2OutDuration: 8,
+  enterDurationFrames: 20,
+  enterLeadFrames: 4,
+  exitDurationFrames: 16,
+  exitLeadFrames: 8,
+  finalExitDurationFrames: 8,
 
   premountFrames: 30,
 
@@ -122,6 +131,27 @@ export const textOverlayDefaultProps: TextOverlayProps = {
 
   backgroundVideo: undefined,
   backgroundVideoVolume: 1,
+};
+
+/** Cumulative frame at which each line nominally starts, plus a trailing
+ * entry for the end of the whole sequence — so line `i` nominally spans
+ * `[frameBoundaries[i], frameBoundaries[i + 1])`. */
+const getFrameBoundaries = (lines: LineConfig[], fps: number): number[] => {
+  const boundaries = [0];
+  for (const line of lines) {
+    boundaries.push(boundaries[boundaries.length - 1] + Math.round(line.holdSeconds * fps));
+  }
+  return boundaries;
+};
+
+export const calculateTextOverlayMetadata: CalculateMetadataFunction<TextOverlayProps> = ({
+  props,
+}) => {
+  const boundaries = getFrameBoundaries(props.lines, TEXT_OVERLAY_FPS);
+  return {
+    fps: TEXT_OVERLAY_FPS,
+    durationInFrames: boundaries[boundaries.length - 1],
+  };
 };
 
 const { fontFamily, waitUntilDone: waitForFont } = loadFont("normal", {
@@ -252,16 +282,12 @@ const TextLine: React.FC<TextLineProps> = ({
 
 export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
   const {
-    line1,
-    line2,
-    line1InStart,
-    line1InDuration,
-    line1OutStart,
-    line1OutDuration,
-    line2InStart,
-    line2InDuration,
-    line2OutEnd,
-    line2OutDuration,
+    lines,
+    enterDurationFrames,
+    enterLeadFrames,
+    exitDurationFrames,
+    exitLeadFrames,
+    finalExitDurationFrames,
     premountFrames,
     slideDistance,
     entryScaleFrom,
@@ -282,19 +308,15 @@ export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
     backgroundVideoVolume,
   } = props;
 
-  const { width } = useVideoConfig();
+  const { width, fps } = useVideoConfig();
 
   const leftInset = safeAreaSide;
   const rightInset = Math.max(safeAreaSide, safeAreaRight);
   const availableWidth = width - leftInset - rightInset;
   const effectiveMaxTextWidth = Math.min(maxTextWidth, availableWidth);
 
-  const line1From = line1InStart;
-  const line1Duration = line1OutStart + line1OutDuration - line1From;
-
-  const line2From = line2InStart;
-  const line2Duration = line2OutEnd - line2From;
-  const line2RelativeOutStart = line2OutEnd - line2OutDuration - line2From;
+  const boundaries = getFrameBoundaries(lines, fps);
+  const total = boundaries[boundaries.length - 1];
 
   const sharedLineProps = {
     slideDistance,
@@ -335,35 +357,38 @@ export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
             top: `${verticalCenterPercent * 100}%`,
           }}
         >
-          <Sequence
-            from={line1From}
-            durationInFrames={line1Duration}
-            premountFor={premountFrames}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            <TextLine
-              text={line1}
-              inDuration={line1InDuration}
-              outStart={line1OutStart - line1From}
-              outDuration={line1OutDuration}
-              {...sharedLineProps}
-            />
-          </Sequence>
+          {lines.map((line, index) => {
+            const isFirst = index === 0;
+            const isLast = index === lines.length - 1;
 
-          <Sequence
-            from={line2From}
-            durationInFrames={line2Duration}
-            premountFor={premountFrames}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            <TextLine
-              text={line2}
-              inDuration={line2InDuration}
-              outStart={line2RelativeOutStart}
-              outDuration={line2OutDuration}
-              {...sharedLineProps}
-            />
-          </Sequence>
+            const inStart = isFirst ? boundaries[index] : boundaries[index] - enterLeadFrames;
+
+            const outStart = isLast
+              ? total - finalExitDurationFrames
+              : boundaries[index + 1] - exitLeadFrames;
+            const outDuration = isLast ? finalExitDurationFrames : exitDurationFrames;
+
+            const from = inStart;
+            const durationInFrames = outStart + outDuration - from;
+
+            return (
+              <Sequence
+                key={index}
+                from={from}
+                durationInFrames={durationInFrames}
+                premountFor={premountFrames}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <TextLine
+                  text={line.text}
+                  inDuration={enterDurationFrames}
+                  outStart={outStart - from}
+                  outDuration={outDuration}
+                  {...sharedLineProps}
+                />
+              </Sequence>
+            );
+          })}
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
