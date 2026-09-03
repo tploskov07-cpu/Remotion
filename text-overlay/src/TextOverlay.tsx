@@ -93,7 +93,14 @@ export const TEXT_OVERLAY_FPS = 30;
 
 export const textOverlayDefaultProps: TextOverlayProps = {
   lines: [
-    { text: "Или не е?", holdSeconds: 2 },
+    {
+      text: "Топка, която в тениса е аут, тук се играе. Точно затова разиграванията са толкова дълги",
+      holdSeconds: 3.5,
+    },
+    {
+      text: "и затова спортът е много по-лесен за начинаещи, отколкото изглежда отстрани.",
+      holdSeconds: 3.5,
+    },
   ],
 
   enterDurationFrames: 20,
