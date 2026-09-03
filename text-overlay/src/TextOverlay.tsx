@@ -93,7 +93,7 @@ export const TEXT_OVERLAY_FPS = 30;
 
 export const textOverlayDefaultProps: TextOverlayProps = {
   lines: [
-    { text: "Тенисистите ще кажат, че тази топка е аут", holdSeconds: 3.5 },
+    { text: "Или не е?", holdSeconds: 2 },
   ],
 
   enterDurationFrames: 20,
