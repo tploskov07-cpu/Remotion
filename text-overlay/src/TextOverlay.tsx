@@ -90,15 +90,22 @@ export type TextOverlayProps = {
    * transparent so the overlay can be composited in an editor. */
   backgroundVideo?: string;
   backgroundVideoVolume?: number;
+  /** Optional solid fill behind everything (e.g. a chroma-key green/magenta
+   * for editors that don't import alpha video reliably). Left unset, the
+   * background stays fully transparent. Ignored when backgroundVideo is
+   * set. */
+  backgroundColor?: string;
 };
 
 export const TEXT_OVERLAY_FPS = 30;
 
 export const textOverlayDefaultProps: TextOverlayProps = {
   lines: [
-    { text: "Падел се играе от четирима.", holdSeconds: 3 },
-    { text: "Пада се само по 11 евро на човек", holdSeconds: 2.5 },
-    { text: "По-евтино от 1 коктейл в капана!", holdSeconds: 2 },
+    { text: "Закрити кортове", holdSeconds: 1.5 },
+    { text: "Осветление", holdSeconds: 1.5 },
+    { text: "Безплатен паркинг", holdSeconds: 4 },
+    { text: "Ресторант", holdSeconds: 4 },
+    { text: "и уютни съблекални", holdSeconds: 5 },
   ],
 
   enterDurationFrames: 20,
@@ -131,6 +138,7 @@ export const textOverlayDefaultProps: TextOverlayProps = {
 
   backgroundVideo: undefined,
   backgroundVideoVolume: 1,
+  backgroundColor: undefined,
 };
 
 /** Cumulative frame at which each line nominally starts, plus a trailing
@@ -306,6 +314,7 @@ export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
     verticalCenterPercent,
     backgroundVideo,
     backgroundVideoVolume,
+    backgroundColor,
   } = props;
 
   const { width, fps } = useVideoConfig();
@@ -337,6 +346,8 @@ export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
         <AbsoluteFill>
           <OffthreadVideo src={backgroundVideo} volume={backgroundVideoVolume} />
         </AbsoluteFill>
+      ) : backgroundColor ? (
+        <AbsoluteFill style={{ backgroundColor }} />
       ) : null}
 
       <AbsoluteFill

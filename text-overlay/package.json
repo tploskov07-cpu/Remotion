@@ -29,7 +29,8 @@
     "lint": "eslint src && tsc",
     "render:mp4": "remotion render TextOverlay out/text.mp4 --codec=h264 --muted",
     "render:alpha": "remotion render TextOverlay out/text.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png --muted",
-    "render:webm": "remotion render TextOverlay out/text.webm --codec=vp9 --pixel-format=yuva420p --image-format=png --muted"
+    "render:webm": "remotion render TextOverlay out/text.webm --codec=vp9 --pixel-format=yuva420p --image-format=png --muted",
+    "render:chromakey": "remotion render TextOverlay out/text-chromakey.mp4 --codec=h264 --muted --props='{\"backgroundColor\":\"#FF00FF\"}'"
   },
   "sideEffects": [
     "*.css"
