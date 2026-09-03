@@ -26,29 +26,21 @@ export type ScrimStyle = "shadow" | "panel";
 export type LineConfig = {
   /** Cyrillic (or any) copy for this line. */
   text: string;
-  /** How long this line holds on screen, in seconds, before the next one
-   * starts crossing in. */
+  /** How long this line holds on screen, in seconds — this is its whole
+   * slot, including its own enter and exit animation. */
   holdSeconds: number;
 };
 
 export type TextOverlayProps = {
-  /** The sequence of lines shown one after another, each cross-fading into
-   * the next. */
+  /** The sequence of lines shown one after another. Each line fully fades
+   * out before the next starts fading in — no overlap. */
   lines: LineConfig[];
 
   /** How many frames a line's entrance spring takes to settle. */
   enterDurationFrames: number;
-  /** How many frames before the boundary to the next line a line starts
-   * entering (so it crosses the outgoing line rather than cutting). */
-  enterLeadFrames: number;
-  /** How many frames a mid-sequence exit takes. */
+  /** How many frames every line's exit takes (including the last, so every
+   * line fades out the same way). */
   exitDurationFrames: number;
-  /** How many frames before the boundary to the next line a line starts
-   * exiting. */
-  exitLeadFrames: number;
-  /** How many frames the final line's exit takes (it has no next line to
-   * cross into, so this is its own short fade to the end of the video). */
-  finalExitDurationFrames: number;
 
   /** How many frames before a line becomes visible it is premounted for
    * font loading / layout measurement. */
@@ -109,10 +101,7 @@ export const textOverlayDefaultProps: TextOverlayProps = {
   ],
 
   enterDurationFrames: 20,
-  enterLeadFrames: 4,
   exitDurationFrames: 16,
-  exitLeadFrames: 8,
-  finalExitDurationFrames: 8,
 
   premountFrames: 30,
 
@@ -292,10 +281,7 @@ export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
   const {
     lines,
     enterDurationFrames,
-    enterLeadFrames,
     exitDurationFrames,
-    exitLeadFrames,
-    finalExitDurationFrames,
     premountFrames,
     slideDistance,
     entryScaleFrom,
@@ -325,7 +311,6 @@ export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
   const effectiveMaxTextWidth = Math.min(maxTextWidth, availableWidth);
 
   const boundaries = getFrameBoundaries(lines, fps);
-  const total = boundaries[boundaries.length - 1];
 
   const sharedLineProps = {
     slideDistance,
@@ -369,18 +354,13 @@ export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
           }}
         >
           {lines.map((line, index) => {
-            const isFirst = index === 0;
-            const isLast = index === lines.length - 1;
-
-            const inStart = isFirst ? boundaries[index] : boundaries[index] - enterLeadFrames;
-
-            const outStart = isLast
-              ? total - finalExitDurationFrames
-              : boundaries[index + 1] - exitLeadFrames;
-            const outDuration = isLast ? finalExitDurationFrames : exitDurationFrames;
-
-            const from = inStart;
-            const durationInFrames = outStart + outDuration - from;
+            // Each line occupies its own slot with no overlap: it fades in
+            // at the start of the slot, holds, then fades out completely
+            // before the next line's slot — and thus its own fade-in —
+            // begins.
+            const from = boundaries[index];
+            const durationInFrames = boundaries[index + 1] - from;
+            const outStart = durationInFrames - exitDurationFrames;
 
             return (
               <Sequence
@@ -393,8 +373,8 @@ export const TextOverlay: React.FC<TextOverlayProps> = (props) => {
                 <TextLine
                   text={line.text}
                   inDuration={enterDurationFrames}
-                  outStart={outStart - from}
-                  outDuration={outDuration}
+                  outStart={outStart}
+                  outDuration={exitDurationFrames}
                   {...sharedLineProps}
                 />
               </Sequence>
