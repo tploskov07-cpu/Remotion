@@ -1,0 +1,38 @@
+{
+  "name": "text-overlay",
+  "version": "1.0.0",
+  "description": "My Remotion video",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.520",
+    "@remotion/google-fonts": "4.0.520",
+    "@remotion/layout-utils": "4.0.520",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.520"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.520",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "preview": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "render:mp4": "remotion render TextOverlay out/text.mp4 --codec=h264 --muted",
+    "render:alpha": "remotion render TextOverlay out/text.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png --muted",
+    "render:webm": "remotion render TextOverlay out/text.webm --codec=vp9 --pixel-format=yuva420p --image-format=png --muted",
+    "render:chromakey": "remotion render TextOverlay out/text-chromakey.mp4 --codec=h264 --muted --props='{\"backgroundColor\":\"#FF00FF\"}'"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}
