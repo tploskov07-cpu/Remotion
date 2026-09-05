@@ -2,16 +2,69 @@ import React from "react";
 import {
   AbsoluteFill,
   Easing,
+  Img,
   OffthreadVideo,
   Sequence,
   interpolate,
   spring,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
   type CalculateMetadataFunction,
 } from "remotion";
 import { loadFont } from "@remotion/google-fonts/Montserrat";
 import { fitTextOnNLines } from "@remotion/layout-utils";
+
+// Chromium on Linux has no Apple emoji font (it's proprietary to Apple's
+// OSes), so a raw emoji character renders as a mismatched or missing glyph.
+// For the specific emoji we're asked to show in Apple's style, we composite
+// the actual Apple artwork (from the public emoji-datasource-apple dataset,
+// the same source many chat apps use for an "Apple style" emoji option)
+// as an image instead of relying on font fallback.
+const APPLE_EMOJI_IMAGES: Record<string, string> = {
+  "1f643": staticFile("emoji/1f643.png"), // 🙃 upside-down face
+};
+
+const EMOJI_PATTERN = /\p{Extended_Pictographic}️?/gu;
+
+const toUnifiedCodepoint = (emoji: string): string =>
+  Array.from(emoji.replace(/️/g, ""))
+    .map((char) => char.codePointAt(0)!.toString(16))
+    .join("-");
+
+const renderLineContent = (text: string, fontSize: number): React.ReactNode[] => {
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  EMOJI_PATTERN.lastIndex = 0;
+  while ((match = EMOJI_PATTERN.exec(text))) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    const src = APPLE_EMOJI_IMAGES[toUnifiedCodepoint(match[0])];
+    if (src) {
+      nodes.push(
+        <Img
+          key={match.index}
+          src={src}
+          style={{
+            width: fontSize,
+            height: fontSize,
+            verticalAlign: "-0.15em",
+            display: "inline-block",
+          }}
+        />,
+      );
+    } else {
+      nodes.push(match[0]);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+  return nodes;
+};
 
 // ---------------------------------------------------------------------------
 // Tunables. Everything the animation depends on lives here as props with
@@ -93,7 +146,7 @@ export const TEXT_OVERLAY_FPS = 30;
 
 export const textOverlayDefaultProps: TextOverlayProps = {
   lines: [
-    { text: "Първите 10 минути на корта.", holdSeconds: 12 },
+    { text: "Първи сервис. 🙃", holdSeconds: 8 },
   ],
 
   enterDurationFrames: 20,
@@ -266,7 +319,7 @@ const TextLine: React.FC<TextLineProps> = ({
             textShadow: scrim === "shadow" ? scrimTextShadow : "none",
           }}
         >
-          {line}
+          {renderLineContent(line, fontSize)}
         </div>
       ))}
     </div>
