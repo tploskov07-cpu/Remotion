@@ -146,7 +146,7 @@ export const TEXT_OVERLAY_FPS = 30;
 
 export const textOverlayDefaultProps: TextOverlayProps = {
   lines: [
-    { text: "Първи сервис. 🙃", holdSeconds: 8 },
+    { text: "Няколко минути със треньора по-късно:", holdSeconds: 5 },
   ],
 
   enterDurationFrames: 20,
